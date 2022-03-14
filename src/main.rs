@@ -23,7 +23,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let lon_end = -66.9472;
 
     let charger_locations = download_source_data()?;
-    // let charger_locations = read_csv(&args.path)?;
 
     let grid = generate_grid(args.resolution, lat_start, lon_start, lat_end, lon_end);
     let total = grid.len();
