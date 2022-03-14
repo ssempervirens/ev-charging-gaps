@@ -8,7 +8,7 @@ use ev_charging_gaps::*;
 struct Args {
     /// Path to charger csv file
     #[clap(short, long)]
-    path: String,
+    path: Option<String>,
     /// Grid resolution, in degrees.
     #[clap(short, long, default_value_t = 0.01)]
     resolution: f64,
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let lat_end = 24.5243;
     let lon_end = -66.9472;
 
-    let charger_locations = read_csv(&args.path)?;
+    let charger_locations = download_source_data()?;
 
     let grid = generate_grid(args.resolution, lat_start, lon_start, lat_end, lon_end);
     let total = grid.len();
