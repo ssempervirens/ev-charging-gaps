@@ -1,7 +1,9 @@
 use core::f64;
 use std::{collections::HashMap, error::Error};
 
+use csv::Reader;
 use quadtree_f32::{Item, ItemId, Point, QuadTree, Rect};
+use reqwest;
 use serde::Deserialize;
 use std::f64::consts::PI;
 
@@ -21,6 +23,8 @@ pub struct ChargerLocation {
     longitude: f64,
     #[serde(rename = "ID")]
     id: u64,
+    #[serde(rename = "EV Network Web")]
+    network: String,
 }
 
 pub struct TrialPoint {
@@ -31,6 +35,35 @@ pub struct TrialPoint {
 pub struct AllChargerLocations {
     pub quadtree: QuadTree,
     pub chargers_by_id: HashMap<ItemId, ChargerLocation>,
+}
+
+pub fn download_source_data() -> Result<AllChargerLocations, Box<dyn Error>> {
+    let url = "https://developer.nrel.gov/api/alt-fuel-stations/v1.csv?access=public&api_key=oMa5C8ffgw2DXGNv7HHaWSZKWx2rGeBGdkfLvL70&cards_accepted=all&cng_fill_type=all&cng_psi=all&cng_vehicle_class=all&country=all&download=true&e85_has_blender_pump=false&ev_charging_level=2%2Cdc_fast&ev_connector_type=all&ev_network=all&fuel_type=ELEC&hy_is_retail=true&limit=all&lng_vehicle_class=all&lpg_include_secondary=false&offset=0&owner_type=all&state=all&status=E&utf8_bom=true";
+    let body = reqwest::blocking::get(url)?.text()?;
+    let mut reader = Reader::from_reader(body.as_bytes());
+    let mut chargers_by_id = HashMap::new();
+    let rows = reader
+        .deserialize()
+        .filter_map(|row: Result<ChargerLocation, _>| row.ok())
+        .map(|location| {
+            let id = ItemId(location.id as usize);
+            let point = Item::Point(Point {
+                x: location.latitude as f32,
+                y: location.longitude as f32,
+            });
+            chargers_by_id.insert(id, location);
+            (id, point)
+        });
+    let quadtree = QuadTree::new(rows);
+    println!(
+        "tree = {:?}; len = {}",
+        quadtree.bbox(),
+        chargers_by_id.len()
+    );
+    Ok(AllChargerLocations {
+        quadtree,
+        chargers_by_id,
+    })
 }
 
 pub fn read_csv(path_to_csv: &str) -> Result<AllChargerLocations, Box<dyn Error>> {
