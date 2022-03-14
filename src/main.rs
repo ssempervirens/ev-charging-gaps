@@ -8,7 +8,7 @@ use ev_charging_gaps::*;
 struct Args {
     /// Path to charger csv file
     #[clap(short, long)]
-    path: String,
+    path: Option<String>,
     /// Grid resolution, in degrees.
     #[clap(short, long, default_value_t = 0.01)]
     resolution: f64,
