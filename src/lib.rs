@@ -228,6 +228,7 @@ mod tests {
             latitude: 34.052235,
             longitude: -118.243683,
             id: 1,
+            // network: "Electrify America".to_string(),
         };
         let distance = ny.distance_to(&la);
         let error = (3950_000. - distance).abs();
@@ -239,7 +240,7 @@ mod tests {
         // Test that if we call our nearest_chargers function, test
         // that everything we get back is in our list of real chargers
         // If there is an error, we just want the test to fail
-        let charger_locations = read_csv("fuel_stations.csv").unwrap();
+        let charger_locations = download_source_data().unwrap();
         let ny = TrialPoint {
             latitude: 40.730610,
             longitude: -73.935242,
