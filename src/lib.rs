@@ -15,8 +15,10 @@ pub const MAX_RANGE_METERS: u64 = 400_000;
 pub const CROW_FLIES_RATIO: f64 = 0.1;
 pub const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 
+/// CsvRow includes all information we need about chargers
+/// that is parsed out from CSV row
 #[derive(Clone, Debug, Deserialize, PartialEq)]
-pub struct ChargerLocation {
+pub struct CsvRow {
     #[serde(rename = "Latitude")]
     latitude: f64,
     #[serde(rename = "Longitude")]
@@ -25,6 +27,14 @@ pub struct ChargerLocation {
     id: u64,
     #[serde(rename = "EV Network Web")]
     network: String,
+}
+
+/// All operations done on ChargerLocations type
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChargerLocation {
+    latitude: f64,
+    longitude: f64,
+    id: u64,
 }
 
 pub struct TrialPoint {
@@ -40,48 +50,34 @@ pub struct AllChargerLocations {
 pub fn download_source_data() -> Result<AllChargerLocations, Box<dyn Error>> {
     let url = "https://developer.nrel.gov/api/alt-fuel-stations/v1.csv?access=public&api_key=oMa5C8ffgw2DXGNv7HHaWSZKWx2rGeBGdkfLvL70&cards_accepted=all&cng_fill_type=all&cng_psi=all&cng_vehicle_class=all&country=all&download=true&e85_has_blender_pump=false&ev_charging_level=2%2Cdc_fast&ev_connector_type=all&ev_network=all&fuel_type=ELEC&hy_is_retail=true&limit=all&lng_vehicle_class=all&lpg_include_secondary=false&offset=0&owner_type=all&state=all&status=E&utf8_bom=true";
     let body = reqwest::blocking::get(url)?.text()?;
-    let mut reader = Reader::from_reader(body.as_bytes());
+    let reader = Reader::from_reader(body.as_bytes());
+    read_csv(reader)
+}
+
+pub fn read_csv<R>(mut reader: csv::Reader<R>) -> Result<AllChargerLocations, Box<dyn Error>>
+where
+    R: std::io::Read,
+{
     let mut chargers_by_id = HashMap::new();
     let rows = reader
         .deserialize()
-        .filter_map(|row: Result<ChargerLocation, _>| row.ok())
+        .filter_map(|row: Result<CsvRow, _>| row.ok())
         .map(|location| {
             let id = ItemId(location.id as usize);
             let point = Item::Point(Point {
                 x: location.latitude as f32,
                 y: location.longitude as f32,
             });
-            chargers_by_id.insert(id, location);
-            (id, point)
-        });
-    let quadtree = QuadTree::new(rows);
-    println!(
-        "tree = {:?}; len = {}",
-        quadtree.bbox(),
-        chargers_by_id.len()
-    );
-    Ok(AllChargerLocations {
-        quadtree,
-        chargers_by_id,
-    })
-}
-
-pub fn read_csv(path_to_csv: &str) -> Result<AllChargerLocations, Box<dyn Error>> {
-    // Build the CSV reader and iterate over each record.
-    let mut rdr = csv::Reader::from_path(path_to_csv)?;
-    let mut chargers_by_id = HashMap::new();
-    // Take charger locations and convert them into terator of tuples,
-    // which the quadtree library expects
-    let rows = rdr
-        .deserialize()
-        .filter_map(|row: Result<ChargerLocation, _>| row.ok())
-        .map(|location| {
-            let id = ItemId(location.id as usize);
-            let point = Item::Point(Point {
-                x: location.latitude as f32,
-                y: location.longitude as f32,
-            });
-            chargers_by_id.insert(id, location);
+            // Because we don't need to copy the network strings all the time, just use ChargerLocation type
+            // so we convert csv row into ChargerLocation
+            chargers_by_id.insert(
+                id,
+                ChargerLocation {
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    id: location.id,
+                },
+            );
             (id, point)
         });
     let quadtree = QuadTree::new(rows);
