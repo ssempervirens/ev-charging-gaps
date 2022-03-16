@@ -25,7 +25,7 @@ pub struct CsvRow {
     longitude: f64,
     #[serde(rename = "ID")]
     id: u64,
-    #[serde(rename = "EV Network Web")]
+    #[serde(rename = "EV Network")]
     network: String,
 }
 
@@ -67,6 +67,10 @@ where
     let rows = reader
         .deserialize()
         .filter_map(|row: Result<CsvRow, _>| row.ok())
+        // We are interested in the gaps in non-Tesla charging infrastructure
+        // TODO: might be interesting to make that a command line argument so
+        // we can see gaps in other networks
+        .filter(|row| !row.network.contains("Tesla"))
         .map(|location| {
             let id = ItemId(location.id as usize);
             let point = Item::Point(Point {
