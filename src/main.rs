@@ -22,8 +22,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let lat_end = 24.5243;
     let lon_end = -66.9472;
 
-    let charger_locations = download_source_data()?;
-
+    let charger_locations = match args.path {
+        Some(path) => read_from_file(&path),
+        None => download_source_data(),
+    }?;
     let grid = generate_grid(args.resolution, lat_start, lon_start, lat_end, lon_end);
     let total = grid.len();
     println!("generated grid (length: {})", total);
