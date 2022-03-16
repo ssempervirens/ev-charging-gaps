@@ -54,6 +54,11 @@ pub fn download_source_data() -> Result<AllChargerLocations, Box<dyn Error>> {
     read_csv(reader)
 }
 
+pub fn read_from_file(path_to_csv: &str) -> Result<AllChargerLocations, Box<dyn Error>> {
+    let reader = csv::Reader::from_path(path_to_csv)?;
+    read_csv(reader)
+}
+
 pub fn read_csv<R>(mut reader: csv::Reader<R>) -> Result<AllChargerLocations, Box<dyn Error>>
 where
     R: std::io::Read,
