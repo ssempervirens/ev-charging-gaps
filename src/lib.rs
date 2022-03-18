@@ -47,6 +47,16 @@ pub struct AllChargerLocations {
     pub chargers_by_id: HashMap<ItemId, ChargerLocation>,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct Json {
+    pub routes: Vec<Route>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Route {
+    pub distance: f64,
+}
+
 pub fn download_source_data() -> Result<AllChargerLocations, Box<dyn Error>> {
     let url = "https://developer.nrel.gov/api/alt-fuel-stations/v1.csv?access=public&api_key=oMa5C8ffgw2DXGNv7HHaWSZKWx2rGeBGdkfLvL70&cards_accepted=all&cng_fill_type=all&cng_psi=all&cng_vehicle_class=all&country=all&download=true&e85_has_blender_pump=false&ev_charging_level=2%2Cdc_fast&ev_connector_type=all&ev_network=all&fuel_type=ELEC&hy_is_retail=true&limit=all&lng_vehicle_class=all&lpg_include_secondary=false&offset=0&owner_type=all&state=all&status=E&utf8_bom=true";
     let body = reqwest::blocking::get(url)?.text()?;
@@ -185,6 +195,16 @@ impl TrialPoint {
         chargers_distances.sort_by_key(|(_, distance)| *distance);
         chargers_distances
     }
+
+    pub fn get_osrm_distance(&self, charger: &ChargerLocation) -> f64 {
+        let osrm_api_url = format!(
+            "https://router.project-osrm.org/route/v1/driving/{},{};{},{}",
+            self.latitude, self.longitude, charger.latitude, charger.longitude
+        );
+        let body = reqwest::blocking::get(osrm_api_url).unwrap().json::<Json>();
+        let distance = body.unwrap().routes[0].distance;
+        distance
+    }
 }
 
 pub fn add_meters_to_coords(meters: f64, (lat, lon): (f64, f64)) -> (f64, f64) {
@@ -272,5 +292,20 @@ mod tests {
         for (i, expected) in slow_check.iter().enumerate() {
             assert_eq!(expected.1, (&test_chargers[i]).1);
         }
+    }
+
+    #[test]
+    fn osrm_api_works() {
+        let ny = TrialPoint {
+            latitude: 40.730610,
+            longitude: -73.935242,
+        };
+        let test_atlanta_charger = ChargerLocation {
+            latitude: 33.75,
+            longitude: -84.4,
+            id: 666,
+        };
+        let distance = ny.get_osrm_distance(&test_atlanta_charger);
+        assert_eq!(distance, 585776.3)
     }
 }
