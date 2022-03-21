@@ -199,7 +199,7 @@ impl TrialPoint {
     pub fn get_osrm_distance(&self, charger: &ChargerLocation) -> f64 {
         let osrm_api_url = format!(
             "https://router.project-osrm.org/route/v1/driving/{},{};{},{}",
-            self.latitude, self.longitude, charger.latitude, charger.longitude
+            self.longitude, self.latitude, charger.longitude, charger.latitude
         );
         let body = reqwest::blocking::get(osrm_api_url).unwrap().json::<Json>();
         let distance = body.unwrap().routes[0].distance;
