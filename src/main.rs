@@ -1,4 +1,5 @@
 use clap::Parser;
+use reqwest::blocking::Client;
 use std::error::Error;
 
 use ev_charging_gaps::*;
@@ -33,6 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut unreachable = 0;
     let mut maybe_reachable = 0;
     let mut api_call_counter = 0;
+    let client = Client::new();
     let start = std::time::Instant::now();
     for (i, point) in grid.into_iter().enumerate() {
         let result = point.check_charger(&charger_locations);
@@ -49,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // Where candidates is a vector of ChargerLocations
                 let mut is_reachable = false;
                 for (charger, _) in candidates {
-                    let distance = point.get_osrm_distance(&charger) as u64;
+                    let distance = point.get_osrm_distance(&client, &charger) as u64;
                     api_call_counter += 1;
                     if distance <= MAX_RANGE_METERS {
                         reachable += 1;

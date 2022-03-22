@@ -4,6 +4,7 @@ use std::{collections::HashMap, error::Error};
 use csv::Reader;
 use quadtree_f32::{Item, ItemId, Point, QuadTree, Rect};
 use reqwest;
+use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::f64::consts::PI;
 
@@ -196,12 +197,12 @@ impl TrialPoint {
         chargers_distances
     }
 
-    pub fn get_osrm_distance(&self, charger: &ChargerLocation) -> f64 {
+    pub fn get_osrm_distance(&self, client: &Client, charger: &ChargerLocation) -> f64 {
         let osrm_api_url = format!(
             "https://router.project-osrm.org/route/v1/driving/{},{};{},{}",
             self.longitude, self.latitude, charger.longitude, charger.latitude
         );
-        let body = reqwest::blocking::get(osrm_api_url).unwrap().json::<Json>();
+        let body = client.get(osrm_api_url).send().unwrap().json::<Json>();
         let distance = body.unwrap().routes[0].distance;
         distance
     }
