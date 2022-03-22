@@ -13,6 +13,9 @@ struct Args {
     /// Grid resolution, in degrees.
     #[clap(short, long, default_value_t = 0.01)]
     resolution: f64,
+    /// Base url of OSRM server, default is public API
+    #[clap(short, long, default_value = "https://router.project-osrm.org")]
+    osrm_url: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -51,7 +54,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // Where candidates is a vector of ChargerLocations
                 let mut is_reachable = false;
                 for (charger, _) in candidates {
-                    let distance = point.get_osrm_distance(&client, &charger) as u64;
+                    let distance =
+                        point.get_osrm_distance(&args.osrm_url, &client, &charger) as u64;
                     api_call_counter += 1;
                     if distance <= MAX_RANGE_METERS {
                         reachable += 1;

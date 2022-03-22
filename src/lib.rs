@@ -197,12 +197,20 @@ impl TrialPoint {
         chargers_distances
     }
 
-    pub fn get_osrm_distance(&self, client: &Client, charger: &ChargerLocation) -> f64 {
+    pub fn get_osrm_distance(
+        &self,
+        osrm_url: &String,
+        client: &Client,
+        charger: &ChargerLocation,
+    ) -> f64 {
         let osrm_api_url = format!(
-            "https://router.project-osrm.org/route/v1/driving/{},{};{},{}",
-            self.longitude, self.latitude, charger.longitude, charger.latitude
+            "{}/route/v1/driving/{},{};{},{}",
+            osrm_url, self.longitude, self.latitude, charger.longitude, charger.latitude
         );
-        let body = client.get(osrm_api_url).send().unwrap().json::<Json>();
+        let body = match client.get(osrm_api_url).send() {
+            Ok(body) => body.json::<Json>(),
+            Err(error) => panic!("{}", error),
+        };
         let distance = body.unwrap().routes[0].distance;
         distance
     }
