@@ -32,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut reachable = 0;
     let mut unreachable = 0;
     let mut maybe_reachable = 0;
+    let mut api_call_counter = 0;
     let start = std::time::Instant::now();
     for (i, point) in grid.into_iter().enumerate() {
         let result = point.check_charger(&charger_locations);
@@ -44,10 +45,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             CheckResult::Maybe { candidates } => {
                 maybe_reachable += 1;
+                // Find the distance between points and chargers that are maybe reachable
+                // Where candidates is a vector of ChargerLocations
+                let mut is_reachable = false;
+                for (charger, _) in candidates {
+                    let distance = point.get_osrm_distance(&charger) as u64;
+                    api_call_counter += 1;
+                    if distance <= MAX_RANGE_METERS {
+                        reachable += 1;
+                        is_reachable = true;
+                        break;
+                    }
+                }
+                if is_reachable == false {
+                    unreachable += 1;
+                }
             }
         }
         if i % 1_000 == 0 {
             println!("{}: {:?}", i, start.elapsed());
+            println!("reachable: {}", reachable);
+            println!("unreachable: {}", unreachable);
+            println!("maybe reachable: {}", maybe_reachable);
+            println!("api call count: {}", api_call_counter);
+            api_call_counter = 0;
         }
     }
     println!(

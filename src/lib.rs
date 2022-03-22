@@ -120,7 +120,7 @@ pub enum CheckResult {
 }
 
 impl TrialPoint {
-    pub fn check_charger(self, chargers: &AllChargerLocations) -> CheckResult {
+    pub fn check_charger(&self, chargers: &AllChargerLocations) -> CheckResult {
         let nearest_chargers = self.nearest_chargers(chargers);
 
         // If there are no chargers within MAX_RANGE_METERS, the list will be empty;
