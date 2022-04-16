@@ -1,5 +1,9 @@
 use clap::Parser;
+use geo::algorithm::concave_hull::ConcaveHull;
+use geo::MultiPoint;
 use reqwest::blocking::Client;
+use shapefile::dbase;
+use shapefile::Polygon;
 use std::error::Error;
 
 use ev_charging_gaps::*;
@@ -21,10 +25,14 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     // Bounding box of continental United States
-    let lat_start = 49.1756;
-    let lon_start = -124.7580;
-    let lat_end = 24.5243;
-    let lon_end = -66.9472;
+    // let lat_start = 49.1756;
+    // let lon_start = -124.7580;
+    // let lat_end = 24.5243;
+    // let lon_end = -66.9472;
+    let lat_start = 64.8378;
+    let lon_start = -147.7164;
+    let lat_end = 60.0;
+    let lon_end = -140.0;
 
     let charger_locations = match args.path {
         Some(path) => read_from_file(&path),
@@ -39,6 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut api_call_counter = 0;
     let client = Client::new();
     let start = std::time::Instant::now();
+    let mut not_reachable_points = Vec::new();
     for (i, point) in grid.into_iter().enumerate() {
         let result = point.check_charger(&charger_locations);
         match result {
@@ -47,6 +56,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             CheckResult::No => {
                 unreachable += 1;
+                let geo_point = geo::Point::new(point.latitude, point.longitude);
+                not_reachable_points.push(geo_point);
             }
             CheckResult::Maybe { candidates } => {
                 maybe_reachable += 1;
@@ -65,6 +76,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 if is_reachable == false {
                     unreachable += 1;
+                    let geo_point = geo::Point::new(point.latitude, point.longitude);
+                    not_reachable_points.push(geo_point);
                 }
             }
         }
@@ -81,5 +94,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         "Resolution: {}\n\nTotal points: {}\nReachable: {}\nUnreachable: {}\nUnknown: {}",
         args.resolution, total, reachable, unreachable, maybe_reachable
     );
+    let multipoint = MultiPoint(not_reachable_points);
+    println!("Before concave_hull: {:?}", start.elapsed());
+    let concave_hull = multipoint.concave_hull(2.0); // Documentation uses 2 as example concavity
+    println!("After concave_hull: {:?}", start.elapsed());
+    let table_info = dbase::TableWriterBuilder::new()
+        .add_logical_field(dbase::FieldName::try_from("has_charger").unwrap());
+    let mut writer = shapefile::Writer::from_path("output/test_shapefile.shp", table_info)?;
+    let mut record = dbase::Record::default();
+    record.insert(
+        "has_charger".to_owned(),
+        dbase::FieldValue::Logical(Some(false)),
+    );
+    let converted_polygon = Polygon::from(concave_hull);
+    writer.write_shape_and_record(&converted_polygon, &record)?;
+    println!("Made shapefile: {:?}", start.elapsed());
     Ok(())
 }
