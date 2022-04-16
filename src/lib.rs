@@ -207,9 +207,11 @@ impl TrialPoint {
             "{}/route/v1/driving/{},{};{},{}",
             osrm_url, self.longitude, self.latitude, charger.longitude, charger.latitude
         );
-        let body = match client.get(osrm_api_url).send() {
-            Ok(body) => body.json::<Json>(),
-            Err(error) => panic!("{}", error),
+        let body = loop {
+            match client.get(osrm_api_url.clone()).send() {
+                Ok(body) => break body.json::<Json>(),
+                Err(error) => println!("{}", error),
+            };
         };
         let distance = body.unwrap().routes[0].distance;
         distance
