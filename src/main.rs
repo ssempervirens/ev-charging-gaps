@@ -25,14 +25,10 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     // Bounding box of continental United States
-    // let lat_start = 49.1756;
-    // let lon_start = -124.7580;
-    // let lat_end = 24.5243;
-    // let lon_end = -66.9472;
-    let lat_start = 64.8378;
-    let lon_start = -147.7164;
-    let lat_end = 60.0;
-    let lon_end = -140.0;
+    let lat_start = 49.1756;
+    let lon_start = -124.7580;
+    let lat_end = 24.5243;
+    let lon_end = -66.9472;
 
     let charger_locations = match args.path {
         Some(path) => read_from_file(&path),
