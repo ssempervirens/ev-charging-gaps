@@ -61,17 +61,21 @@ pub struct Route {
     pub distance: f64,
 }
 
+pub struct BoundingBox {
+    pub lat_start: f64,
+    pub lat_end: f64,
+    pub lon_start: f64,
+    pub lon_end: f64,
+}
+
 impl AllChargerLocations {
     pub fn find_gaps(
         self,
         resolution: f64,
-        lat_start: f64,
-        lat_end: f64,
-        lon_start: f64,
-        lon_end: f64,
+        bbox: BoundingBox,
         osrm_url: &str,
     ) -> geo::Polygon<f64> {
-        let grid = generate_grid(resolution, lat_start, lon_start, lat_end, lon_end);
+        let grid = generate_grid(resolution, bbox);
         let total = grid.len();
         println!("generated grid (length: {})", total);
         let mut reachable = 0;
@@ -299,22 +303,16 @@ pub fn add_meters_to_coords(meters: f64, (lat, lon): (f64, f64)) -> (f64, f64) {
     (degrees_lat, degrees_lon)
 }
 
-pub fn generate_grid(
-    resolution: f64,
-    lat_start: f64,
-    lon_start: f64,
-    lat_end: f64,
-    lon_end: f64,
-) -> Vec<TrialPoint> {
+pub fn generate_grid(resolution: f64, bbox: BoundingBox) -> Vec<TrialPoint> {
     // ONLY WORKS IN NORTHERN HEMISPHERE LOL
-    let number_lat_pts = ((lat_start - lat_end) / resolution) as u64;
-    let number_lon_pts = ((lon_end - lon_start) / resolution) as u64;
+    let number_lat_pts = ((bbox.lat_start - bbox.lat_end) / resolution) as u64;
+    let number_lon_pts = ((bbox.lon_end - bbox.lon_start) / resolution) as u64;
     println!("generating {} x {} grid", number_lat_pts, number_lon_pts);
     let mut grid = Vec::with_capacity((number_lat_pts * number_lon_pts) as usize);
     for lat in 0..number_lat_pts {
         for lon in 0..number_lon_pts {
-            let latitude = lat_start + (lat as f64 * resolution);
-            let longitude = lon_start + (lon as f64 * resolution);
+            let latitude = bbox.lat_start + (lat as f64 * resolution);
+            let longitude = bbox.lon_start + (lon as f64 * resolution);
             grid.push(TrialPoint {
                 latitude,
                 longitude,
