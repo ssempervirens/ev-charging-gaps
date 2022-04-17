@@ -201,9 +201,11 @@ dependencies = [
  "clap",
  "csv",
  "geo",
+ "num_cpus",
  "quadtree-f32",
  "reqwest",
  "serde",
+ "serde_json",
  "shapefile",
 ]
 
