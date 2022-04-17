@@ -15,6 +15,7 @@ pub const MAX_RANGE_METERS: u64 = 400_000;
 /// obviously reachable.
 pub const CROW_FLIES_RATIO: f64 = 0.1;
 pub const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
+pub const DEFAULT_OSRM_URL: &'static str = "https://router.project-osrm.org";
 
 /// CsvRow includes all information we need about chargers
 /// that is parsed out from CSV row
@@ -199,7 +200,7 @@ impl TrialPoint {
 
     pub fn get_osrm_distance(
         &self,
-        osrm_url: &String,
+        osrm_url: &str,
         client: &Client,
         charger: &ChargerLocation,
     ) -> f64 {
@@ -316,7 +317,8 @@ mod tests {
             longitude: -84.4,
             id: 666,
         };
-        let distance = ny.get_osrm_distance(&test_atlanta_charger);
+        let client = Client::new();
+        let distance = ny.get_osrm_distance(DEFAULT_OSRM_URL, &client, &test_atlanta_charger);
         assert_eq!(distance, 585776.3)
     }
 }
