@@ -51,7 +51,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             lon_start,
             lat_end,
             lon_end,
-        } & args.osrm_url,
+        },
+        &args.osrm_url,
     );
     let table_info = dbase::TableWriterBuilder::new()
         .add_logical_field(dbase::FieldName::try_from("has_charger").unwrap());

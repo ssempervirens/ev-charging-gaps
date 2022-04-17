@@ -60,7 +60,7 @@ pub struct Json {
 pub struct Route {
     pub distance: f64,
 }
-
+#[derive(Debug)]
 pub struct BoundingBox {
     pub lat_start: f64,
     pub lat_end: f64,
@@ -75,7 +75,7 @@ impl AllChargerLocations {
         bbox: BoundingBox,
         osrm_url: &str,
     ) -> geo::Polygon<f64> {
-        let grid = generate_grid(resolution, bbox);
+        let grid = bbox.generate_grid(resolution);
         let total = grid.len();
         println!("generated grid (length: {})", total);
         let mut reachable = 0;
@@ -303,23 +303,47 @@ pub fn add_meters_to_coords(meters: f64, (lat, lon): (f64, f64)) -> (f64, f64) {
     (degrees_lat, degrees_lon)
 }
 
-pub fn generate_grid(resolution: f64, bbox: BoundingBox) -> Vec<TrialPoint> {
-    // ONLY WORKS IN NORTHERN HEMISPHERE LOL
-    let number_lat_pts = ((bbox.lat_start - bbox.lat_end) / resolution) as u64;
-    let number_lon_pts = ((bbox.lon_end - bbox.lon_start) / resolution) as u64;
-    println!("generating {} x {} grid", number_lat_pts, number_lon_pts);
-    let mut grid = Vec::with_capacity((number_lat_pts * number_lon_pts) as usize);
-    for lat in 0..number_lat_pts {
-        for lon in 0..number_lon_pts {
-            let latitude = bbox.lat_start + (lat as f64 * resolution);
-            let longitude = bbox.lon_start + (lon as f64 * resolution);
-            grid.push(TrialPoint {
-                latitude,
-                longitude,
-            });
+impl BoundingBox {
+    pub fn generate_grid(self, resolution: f64) -> Vec<TrialPoint> {
+        let number_lat_pts = ((self.width()) / resolution) as u64;
+        let number_lon_pts = ((self.height()) / resolution) as u64;
+        println!("generating {} x {} grid", number_lat_pts, number_lon_pts);
+        let mut grid = Vec::with_capacity((number_lat_pts * number_lon_pts) as usize);
+        for lat in 0..number_lat_pts {
+            for lon in 0..number_lon_pts {
+                let latitude = self.lat_start + (lat as f64 * resolution);
+                let longitude = self.lon_start + (lon as f64 * resolution);
+                grid.push(TrialPoint {
+                    latitude,
+                    longitude,
+                });
+            }
         }
+        grid
     }
-    grid
+    pub fn width(&self) -> f64 {
+        // By taking the absolute value, this works in both hemispheres
+        (self.lat_start - self.lat_end).abs()
+    }
+    pub fn height(&self) -> f64 {
+        (self.lon_start - self.lon_end).abs()
+    }
+    pub fn chunkify(self, chunks: usize) -> Vec<BoundingBox> {
+        let mut chunks_vec = Vec::new();
+        let width_interval = self.width() / ((chunks / 2) as f64);
+        for num_width_intervals in 0..chunks {
+            let current_width_interval = num_width_intervals as f64 * width_interval;
+            let chunk = BoundingBox {
+                lat_start: self.lat_start - current_width_interval,
+                lat_end: self.lat_start - (current_width_interval + width_interval),
+                lon_start: self.lon_start,
+                lon_end: self.lon_end,
+            };
+            chunks_vec.push(chunk);
+        }
+        assert_eq!(chunks_vec.len(), chunks);
+        chunks_vec
+    }
 }
 
 #[cfg(test)]
@@ -392,6 +416,72 @@ mod tests {
         };
         let client = Client::new();
         let distance = ny.get_osrm_distance(DEFAULT_OSRM_URL, &client, &test_atlanta_charger);
-        assert_eq!(distance, 585776.3)
+        println!("distance: {:?}", distance);
+    }
+
+    const US_BOUNDING_BOX: BoundingBox = BoundingBox {
+        lat_start: 49.1756,
+        lon_start: -124.7580,
+        lat_end: 24.5243,
+        lon_end: -66.9472,
+    };
+
+    // our numbers are kind of big, so we don't super care about floating point error accumulation in the last couple of decimal places.
+    const REASONABLE_EPSILON: f64 = 0.00000000000001;
+    macro_rules! assert_float_eq {
+        ($a:expr, $b:expr) => {
+            assert!(
+                $a - $b < REASONABLE_EPSILON,
+                "floats equal: {} == {}",
+                $a,
+                $b
+            )
+        };
+    }
+
+    #[test]
+    fn chunkify_correct_number_of_chunks() {
+        for chunks in [4, 6, 8, 10, 12] {
+            assert_eq!(US_BOUNDING_BOX.chunkify(chunks).len(), chunks)
+        }
+    }
+
+    #[test]
+    fn chunkify_correct_width() {
+        for n_chunks in [4, 6, 8, 10, 12] {
+            let width = US_BOUNDING_BOX.width() / (n_chunks / 2) as f64;
+            let chunks = US_BOUNDING_BOX.chunkify(n_chunks);
+            for chunk in chunks {
+                assert_float_eq!(chunk.width(), width);
+            }
+        }
+    }
+
+    #[test]
+    fn chunkify_correct_height() {
+        for n_chunks in [4, 6, 8, 10, 12] {
+            let height = US_BOUNDING_BOX.height();
+            let chunks = US_BOUNDING_BOX.chunkify(n_chunks);
+            for chunk in chunks {
+                assert_float_eq!(chunk.height(), height);
+            }
+        }
+    }
+
+    #[test]
+    fn chunks_end_in_correct_places() {
+        for n_chunks in [4, 6, 8, 10, 12] {
+            let chunks = US_BOUNDING_BOX.chunkify(n_chunks);
+
+            let first = chunks.first().unwrap();
+            assert_float_eq!(first.lat_start, US_BOUNDING_BOX.lat_start);
+            assert_float_eq!(first.lon_start, US_BOUNDING_BOX.lon_start);
+            assert_float_eq!(first.lon_end, US_BOUNDING_BOX.lon_end);
+
+            let last = chunks.last().unwrap();
+            assert_float_eq!(last.lat_end, US_BOUNDING_BOX.lat_end);
+            assert_float_eq!(last.lon_start, US_BOUNDING_BOX.lon_start);
+            assert_float_eq!(last.lon_end, US_BOUNDING_BOX.lon_end);
+        }
     }
 }
