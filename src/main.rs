@@ -3,6 +3,7 @@ use reqwest::blocking::Client;
 use shapefile::dbase;
 use shapefile::Polygon;
 use std::error::Error;
+use std::thread;
 
 use ev_charging_gaps::*;
 
@@ -35,6 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let lon_start = -124.7580;
     let lat_end = 24.5243;
     let lon_end = -66.9472;
+    let client = Client::new();
 
     let charger_locations = match args.path {
         Some(path) => read_from_file(&path),
@@ -44,16 +46,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .expect("If there was no path provided, there should be a NREL API key"),
         ),
     }?;
-    let concave_hull = charger_locations.find_gaps(
-        args.resolution,
-        BoundingBox {
-            lat_start,
-            lon_start,
-            lat_end,
-            lon_end,
-        },
-        &args.osrm_url,
-    );
+    let cpus = dbg!(num_cpus::get());
+    let bounding_box = BoundingBox {
+        lat_start,
+        lon_start,
+        lat_end,
+        lon_end,
+    };
+    let chunks = bounding_box.chunkify(cpus);
+    let mut join_handle_vec = Vec::new();
+    for c in chunks {
+        let charger_locations = charger_locations.clone();
+        let osrm_url = args.osrm_url.clone();
+        let client = client.clone();
+        let thread_join_handle = thread::spawn(move || {
+            charger_locations.find_gaps(args.resolution, c, &osrm_url, client)
+        });
+        join_handle_vec.push(thread_join_handle);
+    }
     let table_info = dbase::TableWriterBuilder::new()
         .add_logical_field(dbase::FieldName::try_from("has_charger").unwrap());
     let mut writer = shapefile::Writer::from_path("output/test_shapefile.shp", table_info)?;
@@ -62,7 +72,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         "has_charger".to_owned(),
         dbase::FieldValue::Logical(Some(false)),
     );
-    let converted_polygon = Polygon::from(concave_hull);
-    writer.write_shape_and_record(&converted_polygon, &record)?;
+    for join_handle in join_handle_vec {
+        let res = join_handle.join().unwrap();
+        let converted_polygon = Polygon::from(res);
+        writer.write_shape_and_record(&converted_polygon, &record)?;
+    }
     Ok(())
 }

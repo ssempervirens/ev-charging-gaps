@@ -1,5 +1,5 @@
 use core::f64;
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, thread, time::Duration};
 
 use csv::Reader;
 use geo::MultiPoint;
@@ -46,6 +46,7 @@ pub struct TrialPoint {
     pub longitude: f64,
 }
 
+#[derive(Clone)]
 pub struct AllChargerLocations {
     pub quadtree: QuadTree,
     pub chargers_by_id: HashMap<ItemId, ChargerLocation>,
@@ -74,15 +75,16 @@ impl AllChargerLocations {
         resolution: f64,
         bbox: BoundingBox,
         osrm_url: &str,
+        client: Client,
     ) -> geo::Polygon<f64> {
         let grid = bbox.generate_grid(resolution);
         let total = grid.len();
-        println!("generated grid (length: {})", total);
+        let thread = thread::current().id();
+        println!("{:?} generated grid (length: {})", thread, total);
         let mut reachable = 0;
         let mut unreachable = 0;
         let mut maybe_reachable = 0;
         let mut api_call_counter = 0;
-        let client = Client::new();
         let start = std::time::Instant::now();
         let mut not_reachable_points = Vec::new();
         for (i, point) in grid.into_iter().enumerate() {
@@ -101,14 +103,21 @@ impl AllChargerLocations {
                     // Find the distance between points and chargers that are maybe reachable
                     // Where candidates is a vector of ChargerLocations
                     let mut is_reachable = false;
+                    let mut tried_chargers = 0;
                     for (charger, _) in candidates {
-                        let distance = point.get_osrm_distance(osrm_url, &client, &charger) as u64;
-                        api_call_counter += 1;
-                        if distance <= MAX_RANGE_METERS {
-                            reachable += 1;
-                            is_reachable = true;
-                            break;
+                        if let Some(distance) = point.get_osrm_distance(osrm_url, &client, &charger)
+                        {
+                            if distance as u64 <= MAX_RANGE_METERS {
+                                reachable += 1;
+                                is_reachable = true;
+                                break;
+                            }
+                            tried_chargers += 1;
+                            if tried_chargers == 50 {
+                                break;
+                            }
                         }
+                        api_call_counter += 1;
                     }
                     if is_reachable == false {
                         unreachable += 1;
@@ -118,20 +127,20 @@ impl AllChargerLocations {
                 }
             }
             if i % 1_000 == 0 {
-                println!("{}: {:?}", i, start.elapsed());
-                println!("reachable: {}", reachable);
-                println!("unreachable: {}", unreachable);
-                println!("maybe reachable: {}", maybe_reachable);
-                println!("api call count: {}", api_call_counter);
+                println!("{:?} {}: {:?}", thread, i, start.elapsed());
+                println!("{:?} reachable: {}", thread, reachable);
+                println!("{:?} unreachable: {}", thread, unreachable);
+                println!("{:?} maybe reachable: {}", thread, maybe_reachable);
+                println!("{:?} api call count: {}", thread, api_call_counter);
                 api_call_counter = 0;
             }
         }
         println!(
-            "Resolution: {}\n\nTotal points: {}\nReachable: {}\nUnreachable: {}\nUnknown: {}",
-            resolution, total, reachable, unreachable, maybe_reachable
+            "{:?} DONE Resolution: {}\n\nTotal points: {}\nReachable: {}\nUnreachable: {}\nUnknown: {}",
+            thread, resolution, total, reachable, unreachable, maybe_reachable
         );
         let multipoint = MultiPoint(not_reachable_points);
-        println!("Before concave_hull: {:?}", start.elapsed());
+        println!("{:?} Before concave_hull: {:?}", thread, start.elapsed());
         multipoint.concave_hull(2.0) // Documentation uses 2 as example concavity
     }
 }
@@ -280,19 +289,46 @@ impl TrialPoint {
         osrm_url: &str,
         client: &Client,
         charger: &ChargerLocation,
-    ) -> f64 {
+    ) -> Option<f64> {
         let osrm_api_url = format!(
             "{}/route/v1/driving/{},{};{},{}",
             osrm_url, self.longitude, self.latitude, charger.longitude, charger.latitude
         );
+        let mut retries = 0;
         let body = loop {
-            match client.get(osrm_api_url.clone()).send() {
-                Ok(body) => break body.json::<Json>(),
-                Err(error) => println!("{}", error),
+            match client
+                .get(osrm_api_url.clone())
+                .send()
+                .and_then(|rsp| rsp.text())
+            {
+                Ok(body) => match serde_json::from_str::<Json>(&body) {
+                    Ok(json) => break json,
+                    // If we get a response back (the request succeeded) but the response doesn't have
+                    // valid response json, we assume there is no possible path between those pts
+                    Err(error) => {
+                        println!(
+                            "{:?} retrying ({}) body error: {}\nbody: {}",
+                            thread::current().id(),
+                            retries,
+                            error,
+                            body,
+                        );
+                        return None;
+                    }
+                },
+                Err(error) => println!(
+                    "{:?} retrying ({}) request error: {}",
+                    thread::current().id(),
+                    retries,
+                    error
+                ),
             };
+            retries += 1;
+            let sleep = if retries > 60 { 60 } else { retries };
+            thread::sleep(Duration::from_secs(sleep));
         };
-        let distance = body.unwrap().routes[0].distance;
-        distance
+        let distance = body.routes[0].distance;
+        Some(distance)
     }
 }
 
@@ -307,7 +343,12 @@ impl BoundingBox {
     pub fn generate_grid(self, resolution: f64) -> Vec<TrialPoint> {
         let number_lat_pts = ((self.width()) / resolution) as u64;
         let number_lon_pts = ((self.height()) / resolution) as u64;
-        println!("generating {} x {} grid", number_lat_pts, number_lon_pts);
+        println!(
+            "{:?} generating {} x {} grid",
+            thread::current().id(),
+            number_lat_pts,
+            number_lon_pts
+        );
         let mut grid = Vec::with_capacity((number_lat_pts * number_lon_pts) as usize);
         for lat in 0..number_lat_pts {
             for lon in 0..number_lon_pts {
