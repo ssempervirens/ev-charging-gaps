@@ -2,6 +2,8 @@ use core::f64;
 use std::{collections::HashMap, error::Error};
 
 use csv::Reader;
+use geo::MultiPoint;
+use geo::{algorithm::concave_hull::ConcaveHull, Polygon};
 use quadtree_f32::{Item, ItemId, Point, QuadTree, Rect};
 use reqwest;
 use reqwest::blocking::Client;
@@ -57,6 +59,77 @@ pub struct Json {
 #[derive(Deserialize, Debug)]
 pub struct Route {
     pub distance: f64,
+}
+
+impl AllChargerLocations {
+    pub fn find_gaps(
+        self,
+        resolution: f64,
+        lat_start: f64,
+        lat_end: f64,
+        lon_start: f64,
+        lon_end: f64,
+        osrm_url: &str,
+    ) -> geo::Polygon<f64> {
+        let grid = generate_grid(resolution, lat_start, lon_start, lat_end, lon_end);
+        let total = grid.len();
+        println!("generated grid (length: {})", total);
+        let mut reachable = 0;
+        let mut unreachable = 0;
+        let mut maybe_reachable = 0;
+        let mut api_call_counter = 0;
+        let client = Client::new();
+        let start = std::time::Instant::now();
+        let mut not_reachable_points = Vec::new();
+        for (i, point) in grid.into_iter().enumerate() {
+            let result = point.check_charger(&self);
+            match result {
+                CheckResult::Yes => {
+                    reachable += 1;
+                }
+                CheckResult::No => {
+                    unreachable += 1;
+                    let geo_point = geo::Point::new(point.latitude, point.longitude);
+                    not_reachable_points.push(geo_point);
+                }
+                CheckResult::Maybe { candidates } => {
+                    maybe_reachable += 1;
+                    // Find the distance between points and chargers that are maybe reachable
+                    // Where candidates is a vector of ChargerLocations
+                    let mut is_reachable = false;
+                    for (charger, _) in candidates {
+                        let distance = point.get_osrm_distance(osrm_url, &client, &charger) as u64;
+                        api_call_counter += 1;
+                        if distance <= MAX_RANGE_METERS {
+                            reachable += 1;
+                            is_reachable = true;
+                            break;
+                        }
+                    }
+                    if is_reachable == false {
+                        unreachable += 1;
+                        let geo_point = geo::Point::new(point.latitude, point.longitude);
+                        not_reachable_points.push(geo_point);
+                    }
+                }
+            }
+            if i % 1_000 == 0 {
+                println!("{}: {:?}", i, start.elapsed());
+                println!("reachable: {}", reachable);
+                println!("unreachable: {}", unreachable);
+                println!("maybe reachable: {}", maybe_reachable);
+                println!("api call count: {}", api_call_counter);
+                api_call_counter = 0;
+            }
+        }
+        println!(
+            "Resolution: {}\n\nTotal points: {}\nReachable: {}\nUnreachable: {}\nUnknown: {}",
+            resolution, total, reachable, unreachable, maybe_reachable
+        );
+        let multipoint = MultiPoint(not_reachable_points);
+        println!("Before concave_hull: {:?}", start.elapsed());
+        multipoint.concave_hull(2.0) // Documentation uses 2 as example concavity
+    }
 }
 
 pub fn download_source_data(nrel_api_key: &str) -> Result<AllChargerLocations, Box<dyn Error>> {
