@@ -59,8 +59,8 @@ pub struct Route {
     pub distance: f64,
 }
 
-pub fn download_source_data() -> Result<AllChargerLocations, Box<dyn Error>> {
-    let url = "https://developer.nrel.gov/api/alt-fuel-stations/v1.csv?access=public&api_key=oMa5C8ffgw2DXGNv7HHaWSZKWx2rGeBGdkfLvL70&cards_accepted=all&cng_fill_type=all&cng_psi=all&cng_vehicle_class=all&country=all&download=true&e85_has_blender_pump=false&ev_charging_level=2%2Cdc_fast&ev_connector_type=all&ev_network=all&fuel_type=ELEC&hy_is_retail=true&limit=all&lng_vehicle_class=all&lpg_include_secondary=false&offset=0&owner_type=all&state=all&status=E&utf8_bom=true";
+pub fn download_source_data(nrel_api_key: &str) -> Result<AllChargerLocations, Box<dyn Error>> {
+    let url = format!("https://developer.nrel.gov/api/alt-fuel-stations/v1.csv?access=public&api_key={}&cards_accepted=all&cng_fill_type=all&cng_psi=all&cng_vehicle_class=all&country=all&download=true&e85_has_blender_pump=false&ev_charging_level=2%2Cdc_fast&ev_connector_type=all&ev_network=all&fuel_type=ELEC&hy_is_retail=true&limit=all&lng_vehicle_class=all&lpg_include_secondary=false&offset=0&owner_type=all&state=all&status=E&utf8_bom=true", nrel_api_key);
     let body = reqwest::blocking::get(url)?.text()?;
     let reader = Reader::from_reader(body.as_bytes());
     read_csv(reader)
@@ -277,7 +277,9 @@ mod tests {
         // Test that if we call our nearest_chargers function, test
         // that everything we get back is in our list of real chargers
         // If there is an error, we just want the test to fail
-        let charger_locations = download_source_data().unwrap();
+        let nrel_api_key =
+            std::env::var("NREL_API_KEY").expect("NREL_API_KEY environment variable is not set");
+        let charger_locations = download_source_data(&nrel_api_key).unwrap();
         let ny = TrialPoint {
             latitude: 40.730610,
             longitude: -73.935242,

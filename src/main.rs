@@ -12,14 +12,22 @@ use ev_charging_gaps::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Path to charger csv file
-    #[clap(short, long)]
+    ///
+    /// If this is not provided, need API key to download
+    /// charger location data
+    #[clap(short, long, required_unless_present = "nrel-api-key")]
     path: Option<String>,
     /// Grid resolution, in degrees.
     #[clap(short, long, default_value_t = 0.01)]
     resolution: f64,
     /// Base url of OSRM server, default is public API
-    #[clap(short, long, default_value = "https://router.project-osrm.org")]
+    #[clap(short, long, default_value = DEFAULT_OSRM_URL)]
     osrm_url: String,
+    /// API key for the downloading NREL charger data
+    ///
+    /// Only needed if path is not set
+    #[clap(long, env = "NREL_API_KEY", required_unless_present = "path")]
+    nrel_api_key: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -32,7 +40,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let charger_locations = match args.path {
         Some(path) => read_from_file(&path),
-        None => download_source_data(),
+        None => download_source_data(
+            &args
+                .nrel_api_key
+                .expect("If there was no path provided, there should be a NREL API key"),
+        ),
     }?;
     let grid = generate_grid(args.resolution, lat_start, lon_start, lat_end, lon_end);
     let total = grid.len();
