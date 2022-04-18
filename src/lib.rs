@@ -110,6 +110,7 @@ impl AllChargerLocations {
                     for (charger, _) in candidates {
                         if let Some(distance) = point.get_osrm_distance(osrm_url, &client, &charger)
                         {
+                            api_call_counter += 1;
                             if distance as u64 <= MAX_RANGE_METERS {
                                 reachable += 1;
                                 is_reachable = true;
@@ -120,7 +121,6 @@ impl AllChargerLocations {
                                 break;
                             }
                         }
-                        api_call_counter += 1;
                     }
                     if is_reachable == false {
                         unreachable += 1;
