@@ -66,10 +66,10 @@ pub struct Route {
 }
 #[derive(Debug)]
 pub struct BoundingBox {
-    pub lat_start: f64,
-    pub lat_end: f64,
-    pub lon_start: f64,
-    pub lon_end: f64,
+    pub lat_min: f64,
+    pub lat_max: f64,
+    pub lon_min: f64,
+    pub lon_max: f64,
 }
 
 impl AllChargerLocations {
@@ -355,8 +355,8 @@ impl BoundingBox {
         let mut grid = Vec::with_capacity((number_lat_pts * number_lon_pts) as usize);
         for lat in 0..number_lat_pts {
             for lon in 0..number_lon_pts {
-                let latitude = self.lat_start + (lat as f64 * resolution);
-                let longitude = self.lon_start + (lon as f64 * resolution);
+                let latitude = self.lat_min + (lat as f64 * resolution);
+                let longitude = self.lon_min + (lon as f64 * resolution);
                 grid.push(TrialPoint {
                     latitude,
                     longitude,
@@ -367,10 +367,10 @@ impl BoundingBox {
     }
     pub fn width(&self) -> f64 {
         // By taking the absolute value, this works in both hemispheres
-        (self.lat_start - self.lat_end).abs()
+        (self.lat_min - self.lat_max).abs()
     }
     pub fn height(&self) -> f64 {
-        (self.lon_start - self.lon_end).abs()
+        (self.lon_min - self.lon_max).abs()
     }
     pub fn chunkify(self, chunks: usize) -> Vec<BoundingBox> {
         let mut chunks_vec = Vec::new();
@@ -378,10 +378,10 @@ impl BoundingBox {
         for num_width_intervals in 0..chunks {
             let current_width_interval = num_width_intervals as f64 * width_interval;
             let chunk = BoundingBox {
-                lat_start: self.lat_start - current_width_interval,
-                lat_end: self.lat_start - (current_width_interval + width_interval),
-                lon_start: self.lon_start,
-                lon_end: self.lon_end,
+                lat_min: self.lat_min - current_width_interval,
+                lat_max: self.lat_max - (current_width_interval + width_interval),
+                lon_min: self.lon_min,
+                lon_max: self.lon_max,
             };
             chunks_vec.push(chunk);
         }

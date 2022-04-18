@@ -32,10 +32,10 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     // Bounding box of continental United States
-    let lat_start = 49.1756;
-    let lon_start = -124.7580;
-    let lat_end = 24.5243;
-    let lon_end = -66.9472;
+    let lat_min = 24.5243;
+    let lon_min = -124.7580;
+    let lat_max = 49.1756;
+    let lon_max = -66.9472;
     let client = Client::new();
 
     let charger_locations = match args.path {
@@ -48,10 +48,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }?;
     let cpus = dbg!(num_cpus::get());
     let bounding_box = BoundingBox {
-        lat_start,
-        lon_start,
-        lat_end,
-        lon_end,
+        lat_min,
+        lon_min,
+        lat_max,
+        lon_max,
     };
     let chunks = bounding_box.chunkify(cpus);
     let mut join_handle_vec = Vec::new();

@@ -70,10 +70,10 @@ fn osrm_api_works() {
 }
 
 const US_BOUNDING_BOX: BoundingBox = BoundingBox {
-    lat_start: 49.1756,
-    lon_start: -124.7580,
-    lat_end: 24.5243,
-    lon_end: -66.9472,
+    lat_min: 24.5243,
+    lon_min: -124.7580,
+    lat_max: 49.1756,
+    lon_max: -66.9472,
 };
 
 // our numbers are kind of big, so we don't super care about floating point error accumulation in the last couple of decimal places.
@@ -124,13 +124,13 @@ fn chunks_end_in_correct_places() {
         let chunks = US_BOUNDING_BOX.chunkify(n_chunks);
 
         let first = chunks.first().unwrap();
-        assert_float_eq!(first.lat_start, US_BOUNDING_BOX.lat_start);
-        assert_float_eq!(first.lon_start, US_BOUNDING_BOX.lon_start);
-        assert_float_eq!(first.lon_end, US_BOUNDING_BOX.lon_end);
+        assert_float_eq!(first.lat_min, US_BOUNDING_BOX.lat_min);
+        assert_float_eq!(first.lon_min, US_BOUNDING_BOX.lon_min);
+        assert_float_eq!(first.lon_max, US_BOUNDING_BOX.lon_max);
 
         let last = chunks.last().unwrap();
-        assert_float_eq!(last.lat_end, US_BOUNDING_BOX.lat_end);
-        assert_float_eq!(last.lon_start, US_BOUNDING_BOX.lon_start);
-        assert_float_eq!(last.lon_end, US_BOUNDING_BOX.lon_end);
+        assert_float_eq!(last.lat_max, US_BOUNDING_BOX.lat_max);
+        assert_float_eq!(last.lon_min, US_BOUNDING_BOX.lon_min);
+        assert_float_eq!(last.lon_max, US_BOUNDING_BOX.lon_max);
     }
 }
