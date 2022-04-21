@@ -124,7 +124,7 @@ impl AllChargerLocations {
                     }
                     if is_reachable == false {
                         unreachable += 1;
-                        let geo_point = geo::Point::new(point.latitude, point.longitude);
+                        let geo_point = geo::Point::new(point.longitude, point.latitude);
                         not_reachable_points.push(geo_point);
                     }
                 }
