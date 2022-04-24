@@ -74,7 +74,7 @@ pub struct BoundingBox {
 
 impl AllChargerLocations {
     pub fn find_gaps(
-        self,
+        &self,
         resolution: f64,
         bbox: BoundingBox,
         osrm_url: &str,

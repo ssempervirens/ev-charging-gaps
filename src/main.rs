@@ -1,4 +1,5 @@
 use clap::Parser;
+use rayon::prelude::*;
 use reqwest::blocking::Client;
 use shapefile::dbase;
 use shapefile::Polygon;
@@ -46,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .expect("If there was no path provided, there should be a NREL API key"),
         ),
     }?;
-    let cpus = dbg!(num_cpus::get());
+    let cpus = dbg!(num_cpus::get() * 16);
     let bounding_box = BoundingBox {
         lat_min,
         lon_min,
@@ -54,27 +55,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         lon_max,
     };
     let chunks = bounding_box.chunkify(cpus);
-    let mut join_handle_vec = Vec::new();
-    for c in chunks {
-        let charger_locations = charger_locations.clone();
-        let osrm_url = args.osrm_url.clone();
-        let client = client.clone();
-        let thread_join_handle = thread::spawn(move || {
-            charger_locations.find_gaps(args.resolution, c, &osrm_url, client)
-        });
-        join_handle_vec.push(thread_join_handle);
-    }
+    let polygons: Vec<_> = chunks
+        .into_par_iter()
+        .map_with(
+            (charger_locations, args.osrm_url),
+            |(charger_locations, osrm_url), c| {
+                charger_locations.find_gaps(args.resolution, c, &osrm_url, client.clone())
+            },
+        )
+        .collect();
     let table_info = dbase::TableWriterBuilder::new()
         .add_logical_field(dbase::FieldName::try_from("has_charger").unwrap());
-    let mut writer = shapefile::Writer::from_path("output/test_shapefile.shp", table_info)?;
+    let mut writer = shapefile::Writer::from_path("output/test_shapefile2.shp", table_info)?;
     let mut record = dbase::Record::default();
     record.insert(
         "has_charger".to_owned(),
         dbase::FieldValue::Logical(Some(false)),
     );
-    for join_handle in join_handle_vec {
-        let res = join_handle.join().unwrap();
-        let converted_polygon = Polygon::from(res);
+    for p in polygons {
+        let converted_polygon = Polygon::from(p);
         writer.write_shape_and_record(&converted_polygon, &record)?;
     }
     Ok(())
