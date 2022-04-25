@@ -43,7 +43,7 @@ pub struct ChargerLocation {
     longitude: f64,
     id: u64,
 }
-
+#[derive(Clone, Copy)]
 pub struct TrialPoint {
     pub latitude: f64,
     pub longitude: f64,
@@ -91,6 +91,7 @@ impl AllChargerLocations {
         let start = std::time::Instant::now();
         let mut not_reachable_points = Vec::new();
         for (i, point) in grid.into_iter().enumerate() {
+            assert!(bbox.contains_point(point));
             let result = point.check_charger(&self);
             match result {
                 CheckResult::Yes => {
@@ -343,7 +344,7 @@ pub fn add_meters_to_coords(meters: f64, (lat, lon): (f64, f64)) -> (f64, f64) {
 }
 
 impl BoundingBox {
-    pub fn generate_grid(self, resolution: f64) -> Vec<TrialPoint> {
+    pub fn generate_grid(&self, resolution: f64) -> Vec<TrialPoint> {
         let number_lat_pts = ((self.width()) / resolution) as u64;
         let number_lon_pts = ((self.height()) / resolution) as u64;
         println!(
@@ -387,5 +388,11 @@ impl BoundingBox {
         }
         assert_eq!(chunks_vec.len(), chunks);
         chunks_vec
+    }
+    pub fn contains_point(&self, point: TrialPoint) -> bool {
+        point.latitude >= self.lat_min
+            && point.latitude <= self.lat_max
+            && point.longitude >= self.lon_min
+            && point.longitude <= self.lat_max
     }
 }

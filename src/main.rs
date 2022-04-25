@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
     let table_info = dbase::TableWriterBuilder::new()
         .add_logical_field(dbase::FieldName::try_from("has_charger").unwrap());
-    let mut writer = shapefile::Writer::from_path("output/test_shapefile2.shp", table_info)?;
+    let mut writer = shapefile::Writer::from_path("output/test_shapefile3.shp", table_info)?;
     let mut record = dbase::Record::default();
     record.insert(
         "has_charger".to_owned(),
