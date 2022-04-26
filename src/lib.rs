@@ -99,7 +99,7 @@ impl AllChargerLocations {
                 }
                 CheckResult::No => {
                     unreachable += 1;
-                    let geo_point = geo::Point::new(point.latitude, point.longitude);
+                    let geo_point = geo::Point::new(point.longitude, point.latitude);
                     not_reachable_points.push(geo_point);
                 }
                 CheckResult::Maybe { candidates } => {
@@ -294,6 +294,7 @@ impl TrialPoint {
         client: &Client,
         charger: &ChargerLocation,
     ) -> Option<f64> {
+        return None;
         let osrm_api_url = format!(
             "{}/route/v1/driving/{},{};{},{}",
             osrm_url, self.longitude, self.latitude, charger.longitude, charger.latitude
