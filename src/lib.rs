@@ -87,8 +87,8 @@ impl AllChargerLocations {
         let mut reachable = 0;
         let mut unreachable = 0;
         let mut maybe_reachable = 0;
-        let mut api_call_counter = 0;
-        let start = std::time::Instant::now();
+        // let mut api_call_counter = 0;
+        // let start = std::time::Instant::now();
         let mut not_reachable_points = Vec::new();
         for (i, point) in grid.into_iter().enumerate() {
             assert!(bbox.contains_point(point));
@@ -111,7 +111,7 @@ impl AllChargerLocations {
                     for (charger, _) in candidates {
                         if let Some(distance) = point.get_osrm_distance(osrm_url, &client, &charger)
                         {
-                            api_call_counter += 1;
+                            // api_call_counter += 1;
                             if distance as u64 <= MAX_RANGE_METERS {
                                 reachable += 1;
                                 is_reachable = true;
@@ -130,21 +130,20 @@ impl AllChargerLocations {
                     }
                 }
             }
-            if i % 1_000 == 0 {
-                println!("{:?} {}: {:?}", thread, i, start.elapsed());
-                println!("{:?} reachable: {}", thread, reachable);
-                println!("{:?} unreachable: {}", thread, unreachable);
-                println!("{:?} maybe reachable: {}", thread, maybe_reachable);
-                println!("{:?} api call count: {}", thread, api_call_counter);
-                api_call_counter = 0;
-            }
+            // if i % 1_000 == 0 {
+            //     println!("{:?} {}: {:?}", thread, i, start.elapsed());
+            //     println!("{:?} reachable: {}", thread, reachable);
+            //     println!("{:?} unreachable: {}", thread, unreachable);
+            //     println!("{:?} maybe reachable: {}", thread, maybe_reachable);
+            //     println!("{:?} api call count: {}", thread, api_call_counter);
+            //     api_call_counter = 0;
+            // }
         }
         println!(
             "{:?} DONE Resolution: {}\n\nTotal points: {}\nReachable: {}\nUnreachable: {}\nUnknown: {}",
             thread, resolution, total, reachable, unreachable, maybe_reachable
         );
         let multipoint = MultiPoint(not_reachable_points);
-        println!("{:?} Before concave_hull: {:?}", thread, start.elapsed());
         multipoint.concave_hull(2.0) // Documentation uses 2 as example concavity
     }
 }
