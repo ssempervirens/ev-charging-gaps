@@ -375,18 +375,25 @@ impl BoundingBox {
     }
     pub fn chunkify(self, chunks: usize) -> Vec<BoundingBox> {
         let mut chunks_vec = Vec::new();
-        let width_interval = self.width() / ((chunks / 2) as f64);
-        for num_width_intervals in 0..chunks {
-            let current_width_interval = num_width_intervals as f64 * width_interval;
-            let chunk = BoundingBox {
-                lat_min: self.lat_min - current_width_interval,
-                lat_max: self.lat_max - (current_width_interval + width_interval),
-                lon_min: self.lon_min,
-                lon_max: self.lon_max,
-            };
-            chunks_vec.push(chunk);
+        let sqrt_chunks = (chunks as f64).sqrt();
+        let num_width_intervals = sqrt_chunks.floor();
+        let num_height_intervals = sqrt_chunks.ceil();
+        let width_interval = self.width() / sqrt_chunks.floor();
+        let height_interval = self.height() / sqrt_chunks.ceil();
+        for n_w in 0..num_width_intervals as usize {
+            for n_h in 0..num_height_intervals as usize {
+                let current_width_interval = n_w as f64 * width_interval;
+                let current_height_interval = n_h as f64 * height_interval;
+                let chunk = BoundingBox {
+                    lat_min: self.lat_min - current_width_interval,
+                    lat_max: self.lat_max - (current_width_interval + width_interval),
+                    lon_min: self.lon_min - current_height_interval,
+                    lon_max: self.lon_max - (current_height_interval + height_interval),
+                };
+                chunks_vec.push(chunk);
+            }
         }
-        assert_eq!(chunks_vec.len(), chunks);
+        assert!(chunks_vec.len() >= chunks);
         chunks_vec
     }
     pub fn contains_point(&self, point: TrialPoint) -> bool {
