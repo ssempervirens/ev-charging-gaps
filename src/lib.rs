@@ -2,8 +2,6 @@ use core::f64;
 use std::{collections::HashMap, error::Error, thread, time::Duration};
 
 use csv::Reader;
-use geo::MultiPoint;
-use geo::{algorithm::concave_hull::ConcaveHull, Polygon};
 use quadtree_f32::{Item, ItemId, Point, QuadTree, Rect};
 use reqwest;
 use reqwest::blocking::Client;
@@ -79,7 +77,7 @@ impl AllChargerLocations {
         bbox: BoundingBox,
         osrm_url: &str,
         client: Client,
-    ) -> geo::Polygon<f64> {
+    ) -> Vec<geo::Point<f64>> {
         let grid = bbox.generate_grid(resolution);
         let total = grid.len();
         let thread = thread::current().id();
@@ -143,8 +141,7 @@ impl AllChargerLocations {
             "{:?} DONE Resolution: {}\n\nTotal points: {}\nReachable: {}\nUnreachable: {}\nUnknown: {}",
             thread, resolution, total, reachable, unreachable, maybe_reachable
         );
-        let multipoint = MultiPoint(not_reachable_points);
-        multipoint.concave_hull(2.0) // Documentation uses 2 as example concavity
+        not_reachable_points
     }
 }
 
@@ -393,7 +390,7 @@ impl BoundingBox {
                 chunks_vec.push(chunk);
             }
         }
-        assert!(chunks_vec.len() >= chunks);
+        assert!(!chunks_vec.is_empty());
         chunks_vec
     }
     pub fn contains_point(&self, point: TrialPoint) -> bool {
