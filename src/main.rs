@@ -2,7 +2,7 @@ use clap::Parser;
 use rayon::prelude::*;
 use reqwest::blocking::Client;
 use shapefile::dbase;
-use shapefile::Polygon;
+use shapefile::Multipoint;
 use std::error::Error;
 use std::sync::{
     atomic::{AtomicUsize, Ordering::Relaxed},
@@ -88,9 +88,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "has_charger".to_owned(),
         dbase::FieldValue::Logical(Some(false)),
     );
-    for p in polygons {
-        let converted_polygon = Polygon::from(p);
-        writer.write_shape_and_record(&converted_polygon, &record)?;
+    let mut points = Vec::new();
+    for mut p in polygons {
+        points.append(&mut p);
     }
+    let converted_multipoint = Multipoint::from(geo::MultiPoint(points));
+    writer.write_shape_and_record(&converted_multipoint, &record)?;
     Ok(())
 }
