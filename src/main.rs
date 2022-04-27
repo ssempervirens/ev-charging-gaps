@@ -4,7 +4,11 @@ use reqwest::blocking::Client;
 use shapefile::dbase;
 use shapefile::Polygon;
 use std::error::Error;
-use std::thread;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering::Relaxed},
+    Arc,
+};
+use std::time::Instant;
 
 use ev_charging_gaps::*;
 
@@ -55,15 +59,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         lon_max,
     };
     let chunks = bounding_box.chunkify(cpus);
+    let completed = Arc::new(AtomicUsize::new(0));
+    let start = Instant::now();
     let polygons: Vec<_> = chunks
         .into_par_iter()
         .map_with(
-            (charger_locations, args.osrm_url),
-            |(charger_locations, osrm_url), c| {
-                charger_locations.find_gaps(args.resolution, c, &osrm_url, client.clone())
+            (charger_locations, args.osrm_url, completed),
+            |(charger_locations, osrm_url, completed), c| {
+                let start = Instant::now();
+                let polygon =
+                    charger_locations.find_gaps(args.resolution, c, &osrm_url, client.clone());
+                println!(
+                    "Completed chunk {}/{} in {:?}",
+                    completed.fetch_add(1, Relaxed),
+                    cpus,
+                    start.elapsed()
+                );
+                polygon
             },
         )
         .collect();
+    println!("Completed all chunks in {:?}", start.elapsed());
     let table_info = dbase::TableWriterBuilder::new()
         .add_logical_field(dbase::FieldName::try_from("has_charger").unwrap());
     let mut writer = shapefile::Writer::from_path("output/test_shapefile3.shp", table_info)?;
